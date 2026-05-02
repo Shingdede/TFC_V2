@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TFC 動態模擬器 V7.0 (各原料供應商獨立設定版)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        h1, h2, h3 { color: #2c3e50; margin-top: 0; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-top: 4px solid #3498db; }
+        .card-purchasing { border-top-color: #9b59b6; grid-column: 1 / -1; } /* 讓採購部橫跨全寬 */
+        .card-operations { border-top-color: #e67e22; } 
+        .card-sales { border-top-color: #34495e; } 
+        .card-scm { border-top-color: #2ecc71; } 
+        .card-danger { border-top-color: #e74c3c; } 
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85em; color: #555; }
+        .form-group input, .form-group select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-run { display: block; width: 100%; padding: 15px; background-color: #e74c3c; color: white; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.3s; margin-top: 20px; }
+        .btn-run:hover { background-color: #c0392b; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .highlight { font-size: 1.6em; font-weight: bold; color: #d35400; margin-top: 5px; }
+        .material-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; background-color: #f9f9f9; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>TFC 動態模擬器 V7.0 (各原料獨立設定版)</h1>
+    <p>⚡ 完全解鎖 5 項原料供應商可靠度 ＆ 生產凍結期設定 (預設已帶入您的 R2 真實決策)</p>
+</div>
+
+<!-- 🛒 採購部獨立一區 (跨全寬) -->
+<div class="grid-container" style="grid-template-columns: 1fr;">
+    <div class="card card-purchasing">
+        <h3>🛒 採購部 (Purchasing) - 供應商可靠度與倉儲</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div class="form-group"><label>原料倉庫容量 (托盤)</label><input type="number" id="rm-wh-limit" value="600"></div>
+        </div>
+        <label style="font-weight: bold; color: #555; font-size: 0.9em; margin-bottom: 5px; display:block;">各項原料供應商可靠度 (%) 👇預設為 R2 各廠商真實數據</label>
+        <div class="material-grid">
+            <div class="form-group"><label>📦 1L裝 </label><input type="number" id="rel-1l" value="98.2" min="50" max="100" step="0.1"></div>
+            <div class="form-group"><label>📦 PET </label><input type="number" id="rel-pet" value="96.7" min="50" max="100" step="0.1"></div>
+            <div class="form-group"><label>🍊 橙汁原漿 </label><input type="number" id="rel-orange" value="97.6" min="50" max="100" step="0.1"></div>
+            <div class="form-group"><label>🥭 芒果 </label><input type="number" id="rel-mango" value="93.8" min="50" max="100" step="0.1"></div>
+            <div class="form-group"><label>💊 維生素C </label><input type="number" id="rel-vitc" value="99.5" min="50" max="100" step="0.1"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 其他三大角色策略設定區 -->
+<div class="grid-container">
+    <div class="card card-operations">
+        <h3>🏭 營運部 (Operations)</h3>
+        <div class="form-group"><label>成品倉庫容量 (托盤)</label><input type="number" id="fg-wh-limit" value="1000"></div>
+        <div class="form-group"><label>快速換模 (SMED)</label>
+            <select id="smed-active">
+                <option value="true" selected>已啟用 (降低換線浪費)</option>
+                <option value="false">未啟用 (極高換線浪費)</option>
+            </select>
+        </div>
+    </div>
+    <div class="card card-sales">
+        <h3>📈 銷售部 (Sales)</h3>
+        <div class="form-group"><label>合約承諾交貨率 (%)</label><input type="number" id="target-sl" value="94"></div>
+        <div class="form-group"><label>客戶保質期承諾</label>
+            <select id="target-shelf">
+                <option value="low" selected>寬鬆 (R2設定: 75~78%易報廢)</option>
+                <option value="high">嚴格 (高保鮮要求)</option>
+            </select>
+        </div>
+    </div>
+    <div class="card card-scm">
+        <h3>🔗 供應鏈全局 (SCM)</h3>
+        <div class="form-group">
+            <label>生產計畫凍結期 (週)</label>
+            <input type="number" id="frozen-period" value="1" min="1" max="5" step="1" style="background-color: #fef9e7;">
+        </div>
+        <div class="form-group"><label>所有原料 - 安全庫存 SS</label><input type="number" id="rm-ss" value="1.0" step="0.5"></div>
+        <div class="form-group"><label>所有原料 - 訂貨批量 Lot Size</label><input type="number" id="rm-lot" value="1.0" step="0.5"></div>
+    </div>
+</div>
+
+<h2 style="text-align: center; color: #2c3e50; border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-top: 20px;">🧃 成品生產分級設定區 (預設已帶入您 R2 的無差別 5天 策略)</h2>
+<div class="grid-container">
+    <div class="card card-danger">
+        <h3>🔥 高需求 (純橙汁 1L/PET)</h3>
+        <div class="form-group"><label>生產週期 Interval (天)</label><input type="number" id="fg-int-high" value="5" step="1"></div>
+        <div class="form-group"><label>安全庫存 SS (週)</label><input type="number" id="fg-ss-high" value="1.5" step="0.1"></div>
+    </div>
+    <div class="card card-danger">
+        <h3>⭐ 中需求 (芒果 1L/PET)</h3>
+        <div class="form-group"><label>生產週期 Interval (天)</label><input type="number" id="fg-int-med" value="5" step="1"></div>
+        <div class="form-group"><label>安全庫存 SS (週)</label><input type="number" id="fg-ss-med" value="1.5" step="0.1"></div>
+    </div>
+    <div class="card card-danger">
+        <h3>💧 低需求 (維生素C 1L/PET)</h3>
+        <div class="form-group"><label>生產週期 Interval (天)</label><input type="number" id="fg-int-low" value="5" step="1"></div>
+        <div class="form-group"><label>安全庫存 SS (週)</label><input type="number" id="fg-ss-low" value="1.5" step="0.1"></div>
+    </div>
+</div>
+
+<button class="btn-run" onclick="runSimulation()">▶ 執行 26 週跨部門動態模擬</button>
+
+<div id="results-section" style="display:none; margin-top: 20px;">
+    <div class="card" style="background-color: #e8f6f3; border-top: 4px solid #1abc9c;">
+        <h3>📊 26週 模擬結算報表 (Simulation Results)</h3>
+        <div class="grid-container">
+            <div><p>預估半年 ROI：</p><div class="highlight" id="res-roi" style="color: #27ae60;">0.00 %</div></div>
+            <div><p>實際達成交貨率 (SL)：</p><div class="highlight" id="res-sl">0.0 %</div></div>
+            <div><p>預估半年淨利潤：</p><div class="highlight" id="res-profit" style="color: #2980b9;">€ 0</div></div>
+        </div>
+        <hr>
+        <div class="grid-container" style="text-align: center;">
+            <div><p style="margin:5px 0;">產線換線時間佔比</p><strong id="res-changeover" style="color:#c0392b;">0%</strong></div>
+            <div><p style="margin:5px 0;">廢棄報廢總損失</p><strong id="res-obsolete" style="color:#c0392b;">€ 0</strong></div>
+            <div><p style="margin:5px 0;">合約違約金折損</p><strong id="res-penalty" style="color:#c0392b;">€ 0</strong></div>
+        </div>
+        <div id="res-analysis" style="margin-top: 15px; padding: 10px; background: #fff; border-left: 4px solid #f39c12; font-size: 0.95em; color: #444;"></div>
+    </div>
+</div>
+
+<script>
+// --- TFC 財務基礎設定 (已校準 R2) ---
+const R2_TOTAL_ASSETS = 3200000; 
+const WEEKLY_FIXED_COST = 37500; 
+
+function runSimulation() {
+    // 讀取全局與業務參數
+    const targetSL = parseFloat(document.getElementById('target-sl').value);
+    const shelfLifeSetting = document.getElementById('target-shelf').value;
+    const smedActive = document.getElementById('smed-active').value === 'true';
+    const frozenPeriod = parseInt(document.getElementById('frozen-period').value);
+    const rmWhLimit = parseFloat(document.getElementById('rm-wh-limit').value);
+    const fgWhLimit = parseFloat(document.getElementById('fg-wh-limit').value);
+    
+    // 讀取各項原料的供應商可靠度
+    const rel1L = parseFloat(document.getElementById('rel-1l').value) / 100;
+    const relPet = parseFloat(document.getElementById('rel-pet').value) / 100;
+    const relOrange = parseFloat(document.getElementById('rel-orange').value) / 100;
+    const relMango = parseFloat(document.getElementById('rel-mango').value) / 100;
+    const relVitC = parseFloat(document.getElementById('rel-vitc').value) / 100;
+
+    // 計算平均可靠度來影響整體產線供料穩定度與 COGS (簡化演算法以貼合 TFC 特性)
+    const avgSupplierRel = (rel1L + relPet + relOrange + relMango + relVitC) / 5;
+    
+    // 讀取 SCM 參數 (將天數轉為週，5天=1週)
+    const rmSS = parseFloat(document.getElementById('rm-ss').value);
+    const rmLot = parseFloat(document.getElementById('rm-lot').value);
+    const intHigh = parseFloat(document.getElementById('fg-int-high').value) / 5; 
+    const intMed = parseFloat(document.getElementById('fg-int-med').value) / 5;
+    const intLow = parseFloat(document.getElementById('fg-int-low').value) / 5;
+    const ssHigh = parseFloat(document.getElementById('fg-ss-high').value);
+    const ssMed = parseFloat(document.getElementById('fg-ss-med').value);
+    const ssLow = parseFloat(document.getElementById('fg-ss-low').value);
+
+    // 1. 精準換線時間計算
+    let setupsPerWeek = (2/intHigh) + (2/intMed) + (2/intLow); 
+    let baseChangeoverTime = smedActive ? 0.0325 : 0.078; 
+    let totalChangeoverPct = setupsPerWeek * baseChangeoverTime;
+    
+    // 2. 機台當機與供料延遲計算
+    let machineBreakdown = 0.056; 
+    // 若任一原料可靠度低，就會增加缺料停線風險，故使用 0.98 - 綜合可靠度
+    let supplyDelayRisk = Math.max(0, 0.98 - avgSupplierRel); 
+    
+    // 總稼動率扣除換線與缺料影響
+    let maxRunningCap = 1.0 - machineBreakdown - totalChangeoverPct - (supplyDelayRisk * 0.4);
+    let utilization = 307783 / (413000 * maxRunningCap);
+
+    // 3. 採購單價動態聯動：平均可靠度越低，代表找了便宜廠商，進貨成本下降
+    let cogsMultiplier = 1.0 - (0.98 - avgSupplierRel) * 1.5; 
+    if(cogsMultiplier < 0.75) cogsMultiplier = 0.75; 
+    if(cogsMultiplier > 1.05) cogsMultiplier = 1.05;
+
+    // 4. 模擬財務變數
+    let totalRevenue = 0, totalCogs = 0, totalObsoleteCost = 0, totalPenalty = 0;
+    let rmOverflowCost = 0, fgOverflowCost = 0;
+    
+    let baseWeeklyRev = 94929;
+    let baseWeeklyCogs = 51414 * cogsMultiplier; 
+    let actualSL_Sum = 0;
+
+    let avgRmPallets = 350 * ((rmSS + rmLot/2) / 1.5);
+    let avgFgPallets = 700 * ((ssHigh + intHigh/2) / 2.0);
+
+    // 26週迴圈模擬
+    for (let w = 1; w <= 26; w++) {
+        // 產能滿載或缺料會導致交貨延遲
+        let utilPenalty = Math.max(0, (utilization - 0.85) * 50); 
+        
+        // 🌟 凍結期放大懲罰：凍結期越長，遇到當機或個別廠商遲交時，無法插單的傷害越大
+        let frozenPenalty = (frozenPeriod - 1) * (machineBreakdown + supplyDelayRisk) * 35;
+
+        let weeklySL = 100 - utilPenalty - (machineBreakdown * 20) - (supplyDelayRisk * 60) - frozenPenalty + ((ssHigh - 1.5) * 2);
+        
+        // 加入亂數波動 (+- 2.0%)
+        weeklySL += (Math.random() * 4 - 2.0);
+        weeklySL = Math.min(100, Math.max(0, weeklySL));
+        actualSL_Sum += weeklySL;
+
+        // 違約金 (合約指數) 計算
+        let indexDrop = 0;
+        if (weeklySL < targetSL) {
+            indexDrop = (targetSL - weeklySL) * 0.04; 
+        }
+        let revenueMultiplier = 1.0 - indexDrop;
+        if (weeklySL > targetSL + 1) { revenueMultiplier = 1.0 + (weeklySL - targetSL) * 0.015; }
+
+        let actualRev = baseWeeklyRev * revenueMultiplier;
+        let actualCogs = baseWeeklyCogs * revenueMultiplier;
+        
+        totalRevenue += actualRev;
+        totalCogs += actualCogs;
+        totalPenalty += (baseWeeklyRev - actualRev > 0 ? baseWeeklyRev - actualRev : 0);
+
+        // 廢棄報廢計算
+        let ageHigh = ssHigh + intHigh/2;
+        let ageMed = ssMed + intMed/2;
+        let ageLow = ssLow + intLow/2;
+        
+        let ageL_Base = shelfLifeSetting === 'low' ? 1.5 : 1.0; 
+        let obsWeekly = Math.max(0, ageHigh - ageL_Base)*800 + Math.max(0, ageMed - (ageL_Base-0.3))*400 + Math.max(0, ageLow - (ageL_Base-0.5))*200;
+        totalObsoleteCost += obsWeekly;
+
+        // 爆倉判定
+        let rmVol = avgRmPallets * (0.9 + Math.random()*0.2);
+        if (rmVol > rmWhLimit) { rmOverflowCost += (rmVol - rmWhLimit) * 50; }
+        
+        let fgVol = avgFgPallets * (0.9 + Math.random()*0.2);
+        if (fgVol > fgWhLimit) { fgOverflowCost += (fgVol - fgWhLimit) * 50; }
+    }
+
+    // 結算 ROI
+    let finalSL = actualSL_Sum / 26;
+    let totalFixedCost = WEEKLY_FIXED_COST * 26;
+    let netProfit = totalRevenue - totalCogs - totalFixedCost - totalObsoleteCost - rmOverflowCost - fgOverflowCost;
+    let roi = (netProfit / R2_TOTAL_ASSETS) * 100;
+
+    // 渲染報表
+    document.getElementById('res-roi').innerText = (roi > 0 ? "+" : "") + roi.toFixed(2) + " %";
+    if(roi < 0) { document.getElementById('res-roi').style.color = "#c0392b"; } else { document.getElementById('res-roi').style.color = "#27ae60"; }
+    
+    document.getElementById('res-sl').innerText = finalSL.toFixed(1) + " %";
+    document.getElementById('res-sl').style.color = finalSL < targetSL ? "#c0392b" : "#27ae60";
+    
+    document.getElementById('res-profit').innerText = "€ " + Math.round(netProfit).toLocaleString();
+    document.getElementById('res-changeover').innerText = (totalChangeoverPct * 100).toFixed(1) + " %";
+    document.getElementById('res-obsolete').innerText = "€ " + Math.round(totalObsoleteCost).toLocaleString();
+    document.getElementById('res-penalty').innerText = "€ " + Math.round(totalPenalty).toLocaleString();
+
+    // 智慧診斷
+    let analysis = "💡 <strong>系統深度診斷：</strong><br>";
+    if (avgSupplierRel < 0.90 && frozenPeriod > 2) {
+        analysis += "【高危險組合】您使用了低可靠度供應商，且凍結期過長！任何一個原料（如 PET 或 橙汁）只要發生遲交，生管就無法插單，產線立刻陷入停工待料，交貨率崩盤引發天價違約金。";
+    } else if (totalChangeoverPct > 0.18) {
+        analysis += "【R2 現況重現】您將 Interval 全設為 5，換線時間高達 19.5% 左右，嚴重壓縮產能。儘管您凍結期僅 1 週反應快，且各廠商可靠度都不錯（平均達97%），但產能極限還是讓交貨率卡在 93%~94% 之間，ROI 落在約 +1% 左右。";
+    } else if (roi > 10) {
+        analysis += "【最佳化策略】太棒了！透過精實的分級生產策略（拉長芒果與維C週期），搭配高可靠度廠商與 1 週敏捷凍結期，您完美消除了換線浪費與供貨風險，創造了兩位數的高 ROI！";
+    } else {
+        analysis += "參數微調中。您可以嘗試觀察個別供應商可靠度調降後的影響，或者調整凍結期來測試供應鏈的「敏捷極限」。";
+    }
+    document.getElementById('res-analysis').innerHTML = analysis;
+    document.getElementById('results-section').style.display = 'block';
+}
+</script>
+</body>
+</html>
